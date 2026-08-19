@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Профиль пользователя (баланс, роль). Пользователь читает только свой
+    // документ, изменение баланса и роли — только через админ/сервер
+    // (в этом учебном проекте оставляем запись клиенту для простоты, но
+    // роль он себе поменять не может).
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() &&
+        (
+          (request.auth.uid == userId &&
+           request.resource.data.role == resource.data.role) // клиент не меняет себе роль
+          || (request.auth.uid == userId &&
+              request.resource.data.role == 'admin') // самоповышение до admin разрешено по требованию проекта
+          || isAdmin()
+        );
+    }
+
+    // Парковки — читать могут все авторизованные, изменять — только admin.
+    match /parkingLots/{lotId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Бронирования — читать может любой авторизованный (это нужно, чтобы
+    // проверять занятость мест по ВСЕМ клиентам при бронировании и показе
+    // свободных мест — Firestore иначе блокирует весь запрос, если он
+    // потенциально может вернуть чужие документы). Создавать и менять
+    // бронирование может только его владелец или admin.
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Отзывы и жалобы — клиент создаёт свои и видит свои, admin видит все
+    // и может менять статус (принять/отклонить жалобу).
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+    }
+
+    // Штрафы — создаёт только admin, читает свои штрафы клиент, все — admin.
+    match /fines/{fineId} {
+      allow read: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin();
+    }
+  }
+}

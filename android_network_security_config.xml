@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Positionstack на бесплатном тарифе отдаёт ответы только по обычному HTTP,
+  а Android с версии 9 (API 28) по умолчанию блокирует любой незашифрованный
+  (cleartext) трафик. Этот файл разрешает HTTP-соединения ТОЛЬКО к домену
+  api.positionstack.com, не ослабляя безопасность для всего остального
+  трафика приложения.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">api.positionstack.com</domain>
+    </domain-config>
+</network-security-config>
